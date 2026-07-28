@@ -1,0 +1,277 @@
+import 'package:flutter/material.dart';
+import 'package:apk/dashboard/a_admin/database/db_siswa.dart';
+import 'package:apk/dashboard/a_admin/widget/custom_button.dart';
+
+class FalseDeleteMuridPage extends StatefulWidget {
+  const FalseDeleteMuridPage({super.key});
+
+  @override
+  State<FalseDeleteMuridPage> createState() => _FalseDeleteMuridPageState();
+}
+
+class _FalseDeleteMuridPageState extends State<FalseDeleteMuridPage> {
+  final service = MuridService();
+  List<Map<String, dynamic>> deletedMuridList = [];
+  bool isLoading = true;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    loadData();
+  }
+
+  Future<void> loadData() async {
+    try {
+      final data = await service.getDeletedMurid();
+      if (mounted) {
+        setState(() {
+          deletedMuridList = data;
+          isLoading = false;
+          errorMessage = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          errorMessage = e.toString().replaceAll('Exception: ', '');
+        });
+      }
+    }
+  }
+
+  Future<void> restoreMurid(String idTabel, String name) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Pulihkan Murid"),
+        content: Text("Apakah Anda yakin ingin memulihkan data murid $name?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Batal"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+            child: const Text("Pulihkan", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => isLoading = true);
+    try {
+      await service.restoreMurid(idTabel);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Data murid $name berhasil dipulihkan")),
+        );
+      }
+      loadData();
+    } catch (e) {
+      if (mounted) {
+        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal memulihkan: ${e.toString().replaceAll('Exception: ', '')}")),
+        );
+      }
+    }
+  }
+
+  Future<void> deletePermanentlyMurid(String idTabel, String name) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Hapus Permanen"),
+        content: Text("Apakah Anda yakin ingin menghapus permanen data murid $name? Tindakan ini tidak dapat dibatalkan."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Batal"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text("Hapus", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => isLoading = true);
+    try {
+      await service.deleteMuridPermanently(idTabel);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Data murid $name berhasil dihapus permanen")),
+        );
+      }
+      loadData();
+    } catch (e) {
+      if (mounted) {
+        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal menghapus: ${e.toString().replaceAll('Exception: ', '')}")),
+        );
+      }
+    }
+  }
+
+  String safe(dynamic value) {
+    if (value == null || value.toString().isEmpty) return "N/A";
+    return value.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F7FB),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF2563EB),
+        elevation: 0,
+        automaticallyImplyLeading: true,
+        leading: IconButton(
+          icon: Image.asset('lib/assets/icons/Button.png', width: 30, height: 30),
+          onPressed: () => Navigator.pop(context),
+        ),
+        titleSpacing: -5,
+        title: const Text("Tempat Sampah Murid"),
+        titleTextStyle: const TextStyle(
+          fontFamily: "Inter",
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: loadData,
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : errorMessage != null
+                ? ListView(
+                    children: [
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                      Center(
+                        child: Text(
+                          "Terjadi Kesalahan:\n$errorMessage",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  )
+                : deletedMuridList.isEmpty
+                    ? ListView(
+                        children: [
+                          SizedBox(height: MediaQuery.of(context).size.height * 0.35),
+                          const Center(
+                            child: Text(
+                              "Tidak ada data murid yang dihapus",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView.builder(
+                        itemCount: deletedMuridList.length,
+                        itemBuilder: (context, index) {
+                          final m = deletedMuridList[index];
+                          final nama = safe(m['nama']);
+                          final nis = safe(m['nis']);
+                          final kelas = m['class_name']?['name_class'] ?? 'Belum ada kelas';
+
+                          return Column(
+                            children: [
+                              if (index == 0) const SizedBox(height: 12),
+                              CustomCard(
+                                title: nama,
+                                titleStyle: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1E293B),
+                                ),
+                                customSubtitle: Row(
+                                  children: [
+                                    Text(
+                                      'NIS: $nis',
+                                      style: const TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      width: 4,
+                                      height: 4,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFCBD5E1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        'Kelas: $kelas',
+                                        style: const TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                customIcon: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    InkWell(
+                                      onTap: () => restoreMurid(m['id_tabel'], nama),
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(6.0),
+                                        child: Icon(Icons.restore, color: Colors.green, size: 22),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    InkWell(
+                                      onTap: () => deletePermanentlyMurid(m['id_tabel'], nama),
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(6.0),
+                                        child: Icon(Icons.delete_forever, color: Colors.red, size: 22),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                showIcon: true,
+                                iconContainerSize: 80,
+                                iconPadding: EdgeInsets.zero,
+                                iconDecoration: const BoxDecoration(),
+                                backgroundColor: Colors.white,
+                                borderColor: Colors.transparent,
+                                borderWidth: 0,
+                                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+      ),
+    );
+  }
+}
