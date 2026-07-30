@@ -56,7 +56,7 @@ class DbKelas {
       // Relasi A: Murid yang id_class-nya merujuk ke validClassIds
       final muridListA = await _supabase
           .from('murid')
-          .select('id_tabel, nis, nama, gender, id_class')
+          .select('id_tabel, nis, nama, gender, id_class, created_at')
           .or('status_akun.is.null,status_akun.eq.true')
           .inFilter('id_class', validClassIds.toList());
           
@@ -80,7 +80,7 @@ class DbKelas {
       if (muridIdsFromClass.isNotEmpty) {
         final muridListB = await _supabase
             .from('murid')
-            .select('id_tabel, nis, nama, gender, id_class')
+            .select('id_tabel, nis, nama, gender, id_class, created_at')
             .or('status_akun.is.null,status_akun.eq.true')
             .inFilter('id_tabel', muridIdsFromClass);
             
@@ -112,7 +112,7 @@ class DbKelas {
         if (extraMuridIds.isNotEmpty) {
           final muridListC = await _supabase
               .from('murid')
-              .select('id_tabel, nis, nama, gender, id_class')
+              .select('id_tabel, nis, nama, gender, id_class, created_at')
               .or('status_akun.is.null,status_akun.eq.true')
               .inFilter('id_tabel', extraMuridIds);
               

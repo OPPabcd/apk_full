@@ -693,8 +693,27 @@ class DbAbsensi {
     // Generate rows: 1 row per murid per hari
     final List<Map<String, dynamic>> rowsToInsert = [];
     for (var murid in studentsToInsert) {
+      final String? createdAtStr = murid['created_at']?.toString();
+      DateTime? joinDate;
+      if (createdAtStr != null) {
+        final parsed = DateTime.tryParse(createdAtStr);
+        if (parsed != null) {
+          joinDate = parsed.toLocal();
+        }
+      }
+      
       for (int day = 1; day <= daysInMonth; day++) {
         final date = DateTime(year, month, day);
+        
+        // Skip jika tanggal saat ini sama dengan atau sebelum tanggal murid bergabung
+        // Absen akan mulai dihitung pada H+1 setelah ditambahkan ke kelas
+        if (joinDate != null) {
+          final joinDateOnly = DateTime(joinDate.year, joinDate.month, joinDate.day);
+          if (date.isBefore(joinDateOnly) || date.isAtSameMomentAs(joinDateOnly)) {
+            continue;
+          }
+        }
+
         final formattedDate = DateFormat('yyyy-MM-dd').format(date);
         final isSundayOrHoliday =
             date.weekday == DateTime.sunday || HolidayService.isHoliday(date);
@@ -999,15 +1018,29 @@ class DbAbsensi {
       throw Exception('Tidak ada murid di kelas Anda.');
     }
 
-    // Prepare insert rows
-    final List<Map<String, dynamic>> rowsToInsert = students.map((murid) {
-      return {
+    // Prepare insert rows, skip murid jika belum waktunya (H+1)
+    final List<Map<String, dynamic>> rowsToInsert = [];
+    for (var murid in students) {
+      final String? createdAtStr = murid['created_at']?.toString();
+      if (createdAtStr != null) {
+        final parsed = DateTime.tryParse(createdAtStr);
+        if (parsed != null) {
+          final joinDate = parsed.toLocal();
+          final joinDateOnly = DateTime(joinDate.year, joinDate.month, joinDate.day);
+          final sessionDateOnly = DateTime(date.year, date.month, date.day);
+          // Skip if session date is before or equal to join date (H+1 logic)
+          if (sessionDateOnly.isBefore(joinDateOnly) || sessionDateOnly.isAtSameMomentAs(joinDateOnly)) {
+            continue;
+          }
+        }
+      }
+      rowsToInsert.add({
         'date': formattedDate,
         'user_id': userId,
         'id_murid': murid['id_tabel'],
         'absensi_baru': judul,
-      };
-    }).toList();
+      });
+    }
 
     // Insert into absen table
     await _supabase.from('absen').insert(rowsToInsert);

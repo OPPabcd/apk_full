@@ -123,9 +123,23 @@ class ClassService {
     }).eq('id_tabel', idTabel).eq('user_id', userId);
   }
 
+
   static Future<void> deleteKelas(String idTabel) async {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) throw Exception("User not logged in");
+
+    // Cari semua murid yang ada di kelas ini
+    final murids = await supabase
+        .from('murid')
+        .select('id_tabel')
+        .eq('id_class', idTabel)
+        .eq('user_id', userId);
+
+    if (murids.isNotEmpty) {
+      final listIdMurid = murids.map((m) => m['id_tabel'].toString()).toList();
+      // Hapus data absen untuk semua murid di kelas ini
+      await supabase.from('absen').delete().inFilter('id_murid', listIdMurid);
+    }
 
     // Remove relationships first: set id_class to null for guru and murid
     await supabase.from('guru').update({'id_class': null, 'wali': false}).eq('id_class', idTabel).eq('user_id', userId);
@@ -134,6 +148,7 @@ class ClassService {
     // Then delete the class
     await supabase.from('class_name').delete().eq('id_tabel', idTabel).eq('user_id', userId);
   }
+
 
   static Future<List<Map<String, dynamic>>> getGuruUnassigned() async {
     final userId = supabase.auth.currentUser?.id;
